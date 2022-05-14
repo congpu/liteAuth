@@ -1,0 +1,196 @@
+%%% LiteAuth, a secure exchange protocol between a wireless medical device, a control node, and a healthcare server
+%%% A : Control Node, B : Wireless device, C : Cloud Server
+%%% 1. A -> B : {A,B,Na}_CRP.MAC0
+%%% 2. B -> A : {A,B}_CRP.M1.MAC1.M2.MAC2.M3.MAC3
+
+role role_A(A:agent,B:agent,C:agent,CRP:symmetric_key,Hash:hash_func,SND,RCV:channel(dy))
+played_by A 
+def=
+	local
+		State:nat,
+		Na,Na2,Na3,Nb,Nc:text,
+		PIDA,PIDB,MAC0,M1,MAC1,M2,MAC2,M3,MAC3,M4,MAC4,M5,MAC5,M6,M7,MAC67,M8,MAC8,Ca,Ca2,Ra,Ra2,Sk1,Sk2,Sk4:message
+	init
+		State := 0
+	transition
+		1. State=0 /\ RCV(start) =|>
+		State':=1 /\ Na':=new() /\ PIDA' := Hash({A.Ra}_CRP)
+
+		/\ secret(Na',sec_1,{A,B})
+
+		/\ PIDB':=Hash({B.Ra}_CRP) 
+		/\ MAC0' := Hash({PIDA'.PIDB'.Na'}_CRP.Na')
+		/\ SND ({A.B.Na'}_CRP.MAC0'.PIDA')
+		
+		2. State=2 /\ RCV ({B.A.Na.PIDB'}_CRP.{M1'.MAC1'.M2'.MAC2'.M3'.MAC3'}_CRP) =|>
+		State':=3 /\ Na2':=new()
+
+		/\ secret(Na2',sec_5,{A,C})
+
+		/\ M4':={PIDA.C.Na2'}_CRP
+		/\ MAC4':=Hash({M4'.PIDA.C.Na2'}_CRP.Na2')
+		/\ SND ({A.C.M4'}_CRP.{MAC4'.PIDA.Na2'}_CRP)
+		%/\ SND({A.B.Nb'}_CRP)
+
+		/\ witness(A,B,auth_2,M1')
+		/\ witness(A,B,auth_7,PIDB')
+		/\ request(A,B,auth_1,Na)
+
+		3. State=4 /\ RCV ({C.A.M5'}_CRP.{MAC5'.Nc'}_CRP) =|>
+		State':=5 /\ MAC5':=Hash({M5.C.PIDA.Nc}_CRP)
+		/\ request(A,C,auth_4,MAC5)
+		/\ Na3':=new()
+
+		/\ secret(Na3',sec_7,{A,C})
+
+		/\ Ca2':=Hash({Nc.Na3'}_CRP)
+		/\ Ra2':=Hash({Ca2}_CRP)
+		/\ M6':={PIDA.C.Nc.Na3'}_CRP
+		/\ M7':={PIDA.C.Nc.Na3'.Ra2'}_CRP
+		/\ MAC67':=Hash(M6'.M7'.PIDA.C.Na3'.Ra2')
+		/\ Sk2':=xor(Hash(Na3'),Hash(Nc))
+		/\ SND({A.C.M6'}_CRP.{M7'.MAC67'.M1.MAC1.M2.MAC2.M3.MAC3.Na3'.Ra2'}_CRP)
+
+		/\ witness(A,C,auth_5,M6')
+		/\ witness(A,C,auth_6,M7')
+		
+		4. State=6 /\ RCV({C.A.M8'}_CRP.{MAC8'}_CRP) =|>
+		State':=7 /\ request(A,C,auth_11,M8')
+		/\ Sk4':=xor(Hash(Na),Hash(Nb))
+end role
+
+role role_B(A:agent,B:agent,C:agent,CRP:symmetric_key,Hash:hash_func,SND,RCV:channel(dy))
+played_by B
+def=
+	local
+		State:nat,
+		Na,Na2,Na3,Nb,Nb2,Nc:text,
+		PIDA,PIDB,MAC0,M1,MAC1,M2,MAC2,M3,MAC3,Ca,Ca2,Ra,Ra2,Sk1:message
+		
+	init
+		State := 1
+	transition
+		1. State=1 /\ RCV ({A.B.Na'}_CRP.MAC0'.PIDA) =|>
+		State':=2 /\ Nb' := new() /\PIDB' := Hash({B.Ra}_CRP) /\Nb2':=new()
+
+		%/\ secret(Nb',sec_3,{A,B}) /\ secret(Nb2',sec_4,{A,B})
+
+		/\M1':={PIDA.PIDB'.Nb'}_CRP
+		/\MAC1':=Hash({M1'.PIDB'.PIDA.Nb'}_CRP.Nb')
+		/\M2':={PIDB'.C.Nb2'}_CRP
+		/\MAC2':=Hash({M2'.PIDB'.C.Nb2'}_CRP.Nb2')
+		/\Ca2':=Hash({Nb'.Nb2'}_CRP.Nb'.Nb2')
+		/\Ra2':=Hash({Ca2'}_CRP)
+		/\M3':={PIDB.C.Ra2'}_CRP
+		/\MAC3':=Hash({M3'.PIDB.C.Ra2'}_CRP)
+		/\Sk1':= xor(Hash(Na),(Hash(Nb')))
+		/\SND({B.A.Na'.PIDB'}_CRP.{M1'.MAC1'.M2'.MAC2'.M3'.MAC3'}_CRP)
+		
+		/\ witness(B,A,auth_1,Na')
+		/\ request(B,A,auth_2,Nb')
+		/\ request(B,A,auth_7,PIDB')
+		
+		/\ request(B,C,auth_8,M1')
+		/\ request(B,C,auth_9,M2')
+		/\ request(B,C,auth_10,M3')
+		/\ secret (Nb',sec_2,{A,B})
+		
+		
+end role
+
+role role_C(A:agent,B:agent,C:agent,CRP:symmetric_key,Hash:hash_func,SND,RCV:channel(dy))
+played_by C
+def=
+	local
+		State:nat,
+		Na,Na2,Na3,Nb,Nb2,Nc:text,
+		PIDA,PIDB,MAC0,M1,MAC1,M2,MAC2,M3,MAC3,M4,MAC4,M5,MAC5,M6,M7,MAC67,M8,MAC8,Ca,Ca2,Ra,Ra2,Sk1,Sk3:message
+	init
+		State := 3
+	transition
+		1. State=3 /\ RCV ({A.C.M4'}_CRP.{MAC4'.PIDA.Na2'}_CRP) /\ PIDA=PIDA' =|>
+		State':=4  
+		/\ MAC4':=Hash({M4.PIDA.C.Na2'}_CRP)
+		/\ request(C,A,auth_3,MAC4')
+		/\ Nc':=new()
+
+		/\ secret(Nc',sec_6,{A,C})
+
+		/\ M5':={C.PIDA.Na2.Nc'}_CRP
+		/\ MAC5':=Hash({M5'.C.PIDA.Nc'}_CRP)
+		/\ SND ({C.A.M5'}_CRP.{MAC5'.Nc'}_CRP)
+		
+		/\ witness(C,A,auth_4,MAC5')
+
+		2. State=5 /\ RCV ({A.C.M6'}_CRP.{M7'.MAC67'.M1'.MAC1'.M2'.MAC2'.M3'.MAC3'.Na3'.Ra2'}_CRP) =|>
+		State':=6 /\ MAC67':=Hash({M6'.M7'.A.C.Na3'.Ra2'}_CRP)
+		/\ request(C,A,auth_5,M6')
+		/\ request(C,A,auth_6,M7')
+		/\ Sk3':=xor(Hash(Nc),Hash(Na3'))
+		%/\ request(C,B,auth_7,PIDB')
+		/\ request(C,B,auth_8,M1')
+		/\ request(C,B,auth_9,M2')
+		/\ request(C,B,auth_10,M3')
+		/\ M8':={C.PIDA.Nb}_CRP
+		/\ MAC8':=Hash({M8'.C.PIDA.Nb}_CRP)
+		/\ SND({C.A.M8'}_CRP.{MAC8'}_CRP)
+
+		/\ witness(C,A,auth_11,M8')
+
+end role
+
+role session(A:agent,B:agent,C:agent,CRP:symmetric_key,Hash:hash_func)
+def=
+	local
+		SND3,RCV3,SND2,RCV2,SND1,RCV1:channel(dy)
+	composition
+		role_A(A,B,C,CRP,Hash,SND1,RCV1) /\
+		role_B(A,B,C,CRP,Hash,SND2,RCV2) /\
+		role_C(A,B,C,CRP,Hash,SND3,RCV3)
+end role
+
+role environment()
+def=
+	const
+		controlnode,wirelessdevice,cloudserver:agent,
+		crp:symmetric_key,
+		h:hash_func,
+		sec_1,sec_2,sec_3,sec_4,sec_5,sec_6,sec_7,auth_1,auth_2,auth_3,auth_4,auth_5,auth_6,auth_7,auth_8,auth_9,auth_10,auth_11:protocol_id
+	intruder_knowledge = {controlnode,wirelessdevice,cloudserver,h}
+		
+	composition
+		session(controlnode,wirelessdevice,cloudserver,crp,h)
+		/\ session(wirelessdevice,controlnode,cloudserver,crp,h) 
+		/\ session(controlnode,wirelessdevice,i,crp,h)
+		/\ session(i,wirelessdevice,cloudserver,crp,h)
+		/\ session(controlnode,i,cloudserver,crp,h)
+end role
+
+goal
+	secrecy_of sec_1
+	secrecy_of sec_2
+	secrecy_of sec_3
+	secrecy_of sec_4
+	secrecy_of sec_5
+	secrecy_of sec_6
+	secrecy_of sec_7
+	authentication_on auth_1
+	authentication_on auth_2
+	authentication_on auth_3
+	authentication_on auth_4
+	authentication_on auth_5
+	authentication_on auth_6
+	authentication_on auth_7
+	authentication_on auth_8
+	authentication_on auth_9
+	authentication_on auth_10
+	authentication_on auth_11
+end goal
+
+environment()
+		
+
+
+
+
+
